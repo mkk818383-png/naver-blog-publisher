@@ -1,85 +1,82 @@
 ---
 name: naver-blog-publisher
 description: >
-  Use when the user wants to publish a Naver Blog post, write experience reviews,
-  or generate styled promotional blog content. Now includes automatic competitor
-  research: given a shop name, the agent reads 5–10 real Naver blog posts about
-  that place and writes a new post in the daonlog style.
+  네이버 블로그 포스팅을 발행하거나, 체험단 후기 글을 작성하거나, 스타일이 있는 홍보 블로그 콘텐츠를 생성할 때 사용하세요.
+  업체명을 주면 해당 가게의 실제 네이버 블로그 글 5~10개를 자동으로 읽고, 다온로그 스타일로 새 글을 작성합니다.
 ---
 
-# Naver Blog Publisher
+# 네이버 블로그 발행 스킬
 
-## Overview
+## 개요
 
-This skill writes styled Naver Blog experience-group posts (체험단 포스팅) in Markdown
-and compiles them to copy-pasteable HTML.
+이 스킬은 네이버 모바일 뷰에 최적화된 체험단 포스팅을 마크다운으로 작성하고,
+복붙 가능한 HTML로 컴파일해드립니다.
 
-**Two research modes are supported — use whichever the user provides:**
+**세 가지 리서치 모드를 지원합니다. 사용자가 제공하는 정보에 따라 자동 선택됩니다:**
 
-| Mode | Trigger | What the agent does |
-|------|---------|---------------------|
-| **Auto-search** | User provides shop name only | Agent searches Naver Blog, reads 5–10 posts, distills key facts |
-| **Manual input** | User provides visit notes | Skip crawl; use supplied notes directly |
-| **Hybrid** | Both provided | Crawl first, then enrich with user's personal visit notes |
+| 모드 | 조건 | 에이전트 동작 |
+|------|------|------------|
+| **자동 리서치** | 업체명만 입력 | 네이버 블로그 탭 검색 → 5~10개 글 수집 → 핵심 정보 분석 |
+| **수동 입력** | 방문 메모 상세 제공 | 크롤링 생략, 메모만으로 글 작성 |
+| **혼합** | 둘 다 제공 | 크롤링 팩트 + 사용자 경험 합쳐서 작성 |
 
 ---
 
-## Step 0 — Gather Inputs
+## 0단계 — 입력 정보 수집
 
-Ask the user for **as many of the following as they can provide**. Nothing is strictly required except a way to identify the place.
+사용자에게 아래 정보를 요청합니다. **업체명 또는 방문 메모 중 하나는 반드시 필요합니다.**
 
 ```
 [업체명]: (예: 큰바다도매횟집)               ← 이것만 있으면 자동 리서치 가능
-[블로그 URL 목록]: (선택) 직접 참고할 URL들
+[블로그 URL 목록]: (선택) 직접 지정할 참고 URL들
 [키워드]: (선택) 제목에 넣을 타깃 키워드
 [방문 메모]: (선택) 직접 다녀온 경우 메모
 [광고주 가이드라인]: (선택) 필수 키워드, 지도 첨부 여부 등
 [사진 체크리스트]: (선택) 업로드할 사진 목록
 ```
 
-If `[방문 메모]` is rich and detailed, the agent MAY skip crawling. Otherwise always run Phase 1.
+방문 메모가 충분히 상세하다면 1단계(크롤링)를 건너뛸 수 있습니다.
+그 외에는 **항상 1단계를 먼저 실행**합니다.
 
 ---
 
-## Phase 1 — Competitor Blog Research (automatic)
+## 1단계 — 경쟁사 블로그 자동 리서치
 
-> **Skip this phase only if the user explicitly says "방문 메모만 써줘" or equivalent.**
+> **"방문 메모만 써줘"처럼 사용자가 명시적으로 크롤링 생략을 요청한 경우에만 건너뜁니다.**
 
-### 1-A  Find blog posts
+### 1-A  블로그 글 수집
 
-**Option A — shop name search (default)**
-
-Run the bundled script via terminal:
+bundled 스크립트를 터미널에서 실행합니다:
 
 ```bash
-# SKILL_DIR = path to this skill's folder (where SKILL.md lives)
+# {SKILL_DIR} = 이 SKILL.md가 있는 폴더의 절대 경로
 python3 {SKILL_DIR}/scripts/fetch_competitors.py \
   --query "{업체명}" \
   --count 7 \
-  --output posts/{shop_name}/raw_crawled.json
+  --output posts/{가게이름}/raw_crawled.json
 ```
 
-**Option B — user-supplied URL list**
+URL을 직접 지정하는 경우:
 
 ```bash
 python3 {SKILL_DIR}/scripts/fetch_competitors.py \
   --urls {URL1} {URL2} ... \
-  --output posts/{shop_name}/raw_crawled.json
+  --output posts/{가게이름}/raw_crawled.json
 ```
 
-`{SKILL_DIR}` is the absolute path to the directory containing this SKILL.md.
-`{shop_name}` is derived from `[업체명]` or the first URL's blog title.
+`{SKILL_DIR}`은 이 SKILL.md 파일이 위치한 디렉터리의 절대 경로입니다.
+`{가게이름}`은 `[업체명]` 또는 첫 번째 URL의 블로그 제목에서 추출합니다.
 
-The script will:
-- Search `search.naver.com?where=post&query={업체명}` using Chrome UA + Naver Referer
-- Convert each `blog.naver.com/{id}/{no}` URL → `m.blog.naver.com/PostView.naver?blogId=…&logNo=…`
-- Fetch with iPhone UA + `m.naver.com` Referer to bypass WAF (insane-search strategy)
-- Parse SmartEditor ONE (`se-module-text`) and legacy editor (`postViewArea`) blocks
-- Save results to `raw_crawled.json`
+스크립트 내부 동작 (insane-search 전략):
+- `search.naver.com?where=post&query={업체명}` 검색 (Chrome UA + Naver Referer)
+- `blog.naver.com/{id}/{no}` → `m.blog.naver.com/PostView.naver?blogId=…&logNo=…` 변환
+- iPhone UA + `m.naver.com` Referer로 WAF 우회하여 본문 다운로드
+- SmartEditor ONE(`se-module-text`) 파싱 → 구 에디터(`postViewArea`) 폴백
+- 결과를 `raw_crawled.json`으로 저장
 
-### 1-B  Distill into context.md
+### 1-B  context.md 작성
 
-Read `raw_crawled.json` and write `posts/{shop_name}/context.md` with these sections:
+`raw_crawled.json`을 읽고 `posts/{가게이름}/context.md`를 생성합니다:
 
 ```markdown
 # {업체명} — 리서치 컨텍스트
@@ -93,117 +90,116 @@ Read `raw_crawled.json` and write `posts/{shop_name}/context.md` with these sect
 ## 메뉴 & 가격
 | 메뉴 | 가격 | 언급 횟수 |
 |------|------|----------|
-| … | … | … |
 
 ## 대표 맛·분위기 키워드
-(여러 글에서 반복 등장한 표현들, 볼드 처리)
+(여러 글에서 반복 등장한 표현들, **볼드 강조**)
 
 ## 꿀팁 & 특이사항
 - (현금 결제 혜택, 서비스 메뉴, 웨이팅, 주차 팁 등)
 
-## 부정적 언급 (있을 경우)
-- …
+## 부정적 언급 (있는 경우)
+-
 
 ## 참고 URL 목록
-- …
+-
 ```
 
 ---
 
-## Phase 2 — Strategy Setting
+## 2단계 — 글쓰기 전략 수립
 
-Using `context.md` + `[방문 메모]` (if any) + `[광고주 가이드라인]`, decide:
-- **Angle**: 어떤 독자를 위한 글인가? (예: 명지 주민, 주말 나들이객)
-- **H2 소제목 5–7개** outline (must satisfy all guideline requirements)
+`context.md` + `[방문 메모]` + `[광고주 가이드라인]`을 바탕으로 결정합니다:
+- **앵글**: 어떤 독자를 위한 글인가? (예: 명지 주민, 주말 나들이객)
+- **H2 소제목 5~7개** 아웃라인 (가이드라인 필수 조건 모두 반영)
 
 ---
 
-## Phase 3 — Content Generation (daonlog-style)
+## 3단계 — 본문 작성 (다온로그 스타일)
 
-Write the full blog post in Markdown. **Strict formatting rules:**
+마크다운으로 글 전체를 작성합니다. **규칙을 반드시 지켜야 합니다.**
 
-### Typography Rules
-- **H1 제목**: 공백 제외 **20자 이하** (무조건)
+### 타이포그래피 규칙
+- **H1 제목**: 공백 제외 **20자 이하** (절대 엄수)
 - **본문 각 줄**: 공백 제외 **20자 이하** — 자연스러운 단어 단위로 줄 바꿈
-- **문단**: 1–3줄 후 빈 줄로 구분
+- **문단**: 1~3줄 후 빈 줄로 구분 (이중 엔터)
 
-### Tone & Voice (다온로그 스타일)
+### 말투 & 분위기 (다온로그 스타일)
 - 종결어미: `~요`, `~네요`, `~요!`, `~랍니다`, `~더라고요`, `~했어요`
 - 감성 어미: `~지 뭐예요 ㅋㅋㅋ`, `~얌!`, `~했어용 ㅎㅎ`
 - 이모지: 😌 ✨ 🥹 😆 🤍 🥰 ☺️ 🫶 😌👍
 - 텍스트 이모티콘: `:)` `( ˶'ᵕ'˶)` `(„• ᴗ •„)`
 - **금지 단어**: `결론적으로` `주목할 만한` `이러한` `이를 통해` `살펴보겠습니다` `알아보겠습니다`
 
-### Image Placeholders
-- 사진 체크리스트의 각 항목 → `![[사진 N: 한 줄 설명]]` 으로 삽입
-- 사진 없이 쓸 경우: 단락 전환 자연스러운 지점에 자동 배치
+### 사진 플레이스홀더
+- 사진 체크리스트 각 항목 → `![[사진 N: 한 줄 설명]]` 으로 삽입
+- 사진 목록이 없는 경우: 단락 전환이 자연스러운 지점에 자동 배치
 
-### Info Block
-반드시 포함:
+### 기본 정보 블록 (반드시 포함)
 ```
 📍 주소: …
 ⏰ 영업시간: …
 🚘 주차: …
 ```
-그리고 `[지도: {업체명}]` 태그 (가이드라인에 지도 첨부가 필요한 경우)
+가이드라인에 지도 첨부 필요 시 `[지도: {업체명}]` 태그 추가
 
 ---
 
-## Phase 4 — SEO & Guideline Verification
+## 4단계 — SEO & 가이드라인 검수
 
-Check all of the following before proceeding:
+아래 항목 **모두 통과** 후 다음 단계로 진행합니다:
 
 - [ ] H1 제목 공백 제외 20자 이하
 - [ ] 본문 각 줄 공백 제외 20자 이하
-- [ ] 가이드라인 필수 키워드 제목에 포함
+- [ ] 가이드라인 필수 키워드가 제목에 포함
 - [ ] 가이드라인 본문 키워드 3회 이상 등장
 - [ ] 사진 체크리스트 항목이 모두 `![[사진 N: …]]`에 매핑됨
 - [ ] 금지 단어 없음
 
-Fail → fix inline and re-check.
+실패 항목 있으면 → 즉시 수정 후 재검수
 
 ---
 
-## Phase 5 — HTML Compilation
+## 5단계 — HTML 컴파일
 
-Save `posts/{shop_name}/post.md`, then compile:
+`posts/{가게이름}/post.md` 저장 후 컴파일 실행:
 
 ```bash
 python3 {SKILL_DIR}/scripts/compile.py \
-  posts/{shop_name}/post.md \
+  posts/{가게이름}/post.md \
   {SKILL_DIR}/templates/post_template.html \
-  posts/{shop_name}/post.html
+  posts/{가게이름}/post.html
 ```
 
-Verify `post.html` was created successfully.
+`Success:` 메시지로 생성 확인 필수.
 
 ---
 
-## Output Files
+## 결과물 파일 구조
 
 ```
-posts/{shop_name}/
-  raw_crawled.json   ← Phase 1-A: 크롤링 원본
-  context.md         ← Phase 1-B: 핵심 정보 보고서
-  post.md            ← Phase 3: 다온로그 마크다운 초안
-  post.html          ← Phase 5: 발행용 HTML (복붙용)
+posts/{가게이름}/
+  raw_crawled.json   ← 1단계: 크롤링 원본 데이터
+  context.md         ← 1단계: 핵심 정보 분석 보고서
+  post.md            ← 3단계: 다온로그 마크다운 초안
+  post.html          ← 5단계: 발행용 HTML (복붙용)
 ```
 
 ---
 
-## How to Publish
+## 발행 방법 (최종 단계)
 
-1. `post.html` 열기 → 전체 선택(Cmd+A) → 복사(Cmd+C)
-2. 네이버 블로그 → 글쓰기 → 스마트에디터 ONE → **[HTML]** 탭 클릭
-3. 붙여넣기(Cmd+V)
-4. **[편집기]** 탭으로 돌아와 회색 점선 플레이스홀더 → 실제 사진으로 교체
-5. 최종 검토 후 **발행**
+1. `post.html` 파일 열기
+2. 전체 선택(Cmd+A) → 복사(Cmd+C)
+3. 네이버 블로그 → 글쓰기 → 스마트에디터 ONE → **[HTML]** 탭 클릭
+4. 붙여넣기(Cmd+V)
+5. **[편집기]** 탭으로 돌아와 회색 점선 플레이스홀더 → 실제 사진으로 교체
+6. 최종 검토 후 **발행** 클릭
 
 ---
 
-## Common Mistakes
+## 자주 하는 실수
 
-- H1 제목 글자수 계산 시 공백 포함하여 계산하는 실수 → 공백 **제외** 기준
-- `raw_crawled.json` 없이 글 쓰는 것 → 업체명이 있으면 반드시 Phase 1 먼저
-- `{SKILL_DIR}` 경로 하드코딩 → 항상 이 SKILL.md가 위치한 디렉터리 기준으로 계산
+- H1 제목 글자수를 공백 **포함**으로 계산하는 실수 → 공백 **제외** 기준
+- `raw_crawled.json` 없이 글 쓰는 것 → 업체명이 있으면 반드시 1단계 먼저
+- `{SKILL_DIR}` 경로 하드코딩 → 항상 이 SKILL.md가 있는 디렉터리 기준으로 계산
 - HTML 컴파일 후 경로 미확인 → `Success:` 메시지 반드시 확인
