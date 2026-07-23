@@ -1,0 +1,45 @@
+{
+  "valid_9_sections.md": {
+    "disclosure": "self-paid",
+    "expected": "pass",
+    "closed_world": true
+  },
+  "valid_10_sections.md": {
+    "disclosure": "self-paid",
+    "expected": "pass",
+    "closed_world": true
+  },
+  "excluded_constructs.md": {
+    "disclosure": "self-paid",
+    "expected": "pass",
+    "closed_world": true
+  },
+  "titles_valid.json": {
+    "expected": "ten-ranked-candidates",
+    "closed_world": true
+  },
+  "bongsoosamchun_closed_world.json": {
+    "disclosure": "self-paid",
+    "expected": "inert-facts-claims-canaries",
+    "closed_world": true
+  },
+  "generated_invalid_families": {
+    "base": "valid_9_sections.md or valid_10_sections.md",
+    "disclosure": "self-paid",
+    "families": [
+      "missing-section",
+      "duplicate-section",
+      "reordered-section",
+      "empty-section",
+      "misplaced-optional-section",
+      "below-80-percent",
+      "21-character-line",
+      "adjacent-short-lines",
+      "forbidden-term",
+      "disclosure-mismatch",
+      "invalid-title-count-or-reason"
+    ],
+    "expected": "fail",
+    "closed_world": true
+  }
+}

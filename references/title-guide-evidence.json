@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "notebook_url": "https://notebooklm.google.com/notebook/3a0dbdc4-4f14-4327-93df-7051c8acb0fc",
+  "extraction_date": "2026-07-12",
+  "path_used": "chrome-fallback",
+  "mcp_authentication": "unauthenticated-isolated-profile",
+  "rules": [
+    {
+      "rule_id": "TG-R1",
+      "answer_fragment_sha256": "6c4acaabb842f7fb816d1f91ee4e0e8566e2cd354b80334cb2b8e9fa6e7d9475",
+      "citation_id": "C1",
+      "source_id": "copywriting_guidebook.md",
+      "reopened_evidence_sha256": "2843835a297c846cf07fde6d428e9f07a1d92f9e67190b7ca37a40b72cea8f13",
+      "status": "inferred",
+      "verdict": "verified"
+    },
+    {
+      "rule_id": "TG-R2",
+      "answer_fragment_sha256": "dc48b9cf0b4c86764ec3fe3fd80440a1664597b14ba8afe687ec64d66e3760ad",
+      "citation_id": "C4",
+      "source_id": "copywriting_guidebook.md",
+      "reopened_evidence_sha256": "427e1c9d6a49ba1fe250d0fcc5e320f145dc8079cd144b3496fcc359e5be2662",
+      "status": "inferred",
+      "verdict": "verified"
+    }
+  ],
+  "excluded_claims": [
+    "fixed-15-character-title-target",
+    "front-loaded-keyword-ranking-guarantee",
+    "mandatory-threat-or-information-gap-formulas"
+  ]
+}

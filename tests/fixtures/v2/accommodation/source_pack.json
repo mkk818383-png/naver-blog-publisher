@@ -1,0 +1,1 @@
+{"schema_version":"v2","run_id":"accommodation-fixture","research_status":"complete","sources":[{"id":"SRC-001","url":"https://example.test/accommodation"}],"claims":[{"id":"EXP-001","text":"방문 경험","source_ids":["SRC-001"]}],"conflicts":[],"freshness":{"stale":false},"provenance":{"agent":"fixture"}}

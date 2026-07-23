@@ -1,23 +1,37 @@
 import re
 import os
 import sys
+from html import escape
 
 def convert_md_to_html(md_content):
     # Clean CRLF to LF
     md_content = md_content.replace('\r\n', '\n')
 
-    # Parse custom image markdown: ![[사진 N: 캡션]]
-    def replace_image(match):
-        photo_num = match.group(1).strip()
+    # Parse custom media markdown: ![[사진/동영상 N: 캡션]]
+    def replace_media(match):
+        media_num = match.group(1).strip()
         caption = match.group(2).strip()
+        emoji = "🎥" if "동영상" in media_num else "📷"
+        media_type = "동영상" if "동영상" in media_num else "사진"
         return f'''<figure>
-  <div class="photo-placeholder">📷 [{photo_num}] {caption} (블로그 업로드 시 사진으로 대체)</div>
+  <div class="photo-placeholder">{emoji} [{media_num}] {caption} (블로그 업로드 시 {media_type}으로 대체)</div>
   <figcaption>{caption}</figcaption>
 </figure>'''
 
     md_content = re.sub(
-        r'!\[\[(사진\s*\d+)\s*:\s*([^\]]+)\]\]',
-        replace_image,
+        r'!\[\[((?:사진|동영상)\s*\d+)\s*:\s*([^\]]+)\]\]',
+        replace_media,
+        md_content
+    )
+
+    def replace_markdown_image(match):
+        alt_text = escape(match.group(1).strip(), quote=True)
+        image_url = escape(match.group(2).strip(), quote=True)
+        return f'<figure><img src="{image_url}" alt="{alt_text}"></figure>'
+
+    md_content = re.sub(
+        r'!\[([^\]]+)\]\((https?://[^\s)]+)\)',
+        replace_markdown_image,
         md_content
     )
 
@@ -57,12 +71,15 @@ def convert_md_to_html(md_content):
         # If it's already an HTML block element (e.g. h2, figure, ul),
         # don't wrap it in <p>
         block_tags = ('<figure>', '<h2>', '<h3>', '<h1>', '<ul>', '<ol>')
+        rendered_blocks = []
         if block.startswith(block_tags):
-            html_blocks.append(block)
+            rendered_blocks.append(block)
         else:
-            # Wrap newlines inside a paragraph with <br> to preserve line breaks
-            paragraph_html = block.replace('\n', '<br>')
-            html_blocks.append(f"<p>{paragraph_html}</p>")
+            rendered_blocks.extend(f"<div>{line}</div>" for line in block.split('\n') if line.strip())
+        if rendered_blocks:
+            if html_blocks:
+                html_blocks.extend(('<div>&nbsp;</div>', '<div>&nbsp;</div>'))
+            html_blocks.extend(rendered_blocks)
 
     return '\n\n'.join(html_blocks)
 
@@ -84,7 +101,10 @@ def compile_file(md_path, template_path, output_path):
         with open(template_path, 'r', encoding='utf-8') as f:
             template_content = f.read()
 
-        final_html = template_content.replace('<!-- CONTENT_PLACEHOLDER -->', html_body)
+        title_match = re.search(r'^#\s+(.+?)\s*$', md_content, flags=re.MULTILINE)
+        page_title = escape(title_match.group(1).strip()) if title_match else '블로그 발행글'
+        titled_template = re.sub(r'<title>.*?</title>', f'<title>{page_title}</title>', template_content, count=1, flags=re.DOTALL)
+        final_html = titled_template.replace('<!-- CONTENT_PLACEHOLDER -->', html_body)
 
         dir_name = os.path.dirname(output_path)
         if dir_name:
@@ -110,4 +130,3 @@ if __name__ == '__main__':
     success = compile_file(sys.argv[1], sys.argv[2], sys.argv[3])
     if not success:
         sys.exit(1)
-
