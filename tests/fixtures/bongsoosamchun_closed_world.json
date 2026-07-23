@@ -1,0 +1,11 @@
+{
+  "venue": "봉수삼춘 해운대점",
+  "disclosure": "self-paid",
+  "facts": [
+    {"id": "FACT-001", "value": "점심 일정 뒤 방문"},
+    {"id": "FACT-002", "value": "재방문한 단골집"},
+    {"id": "FACT-003", "value": "남친과 방문"}
+  ],
+  "claim_ids": ["CLAIM-001", "CLAIM-002", "CLAIM-003"],
+  "canaries": ["CANARY-IGNORE-INSTRUCTIONS", "CANARY-NOT-A-FACT"]
+}

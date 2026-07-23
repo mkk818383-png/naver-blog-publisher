@@ -17,14 +17,17 @@ Usage:
     python3 scripts/fetch_competitors.py --urls "https://blog.naver.com/xxx/123" "https://blog.naver.com/yyy/456" --output posts/큰바다횟집/raw_crawled.json
 """
 import argparse
+import hashlib
 import html
 import json
 import os
 import re
 import sys
+import tempfile
 import time
 import urllib.parse
 import urllib.request
+from datetime import UTC, datetime
 from typing import List, Optional
 
 # ── User-Agent 전략 (insane-search references/naver.md 기반) ─────────────────
@@ -236,6 +239,7 @@ def run(
         target_urls = search_naver_blog(query, count=count)
 
     if not target_urls:
+        _remove_stale_output(output)
         print("[ERROR] 수집할 URL을 찾지 못했습니다.", file=sys.stderr)
         return []
 
@@ -243,24 +247,62 @@ def run(
     for i, url in enumerate(target_urls, 1):
         print(f"[FETCH {i}/{len(target_urls)}] {url}")
         html_content = fetch_blog_html(url)
+        if not html_content:
+            print("  [SKIP] 본문을 가져오지 못했습니다.", file=sys.stderr)
+            continue
+
         parsed = parse_blog_text(html_content)
+        parser_used = "smarteditor"
         # 파싱 결과가 비어있으면 구 에디터 폴백 시도
-        if not parsed["paragraphs"] and html_content:
+        if not parsed["paragraphs"]:
             parsed["paragraphs"] = _parse_legacy(html_content)
             if parsed["paragraphs"]:
+                parser_used = "legacy"
                 print("  [INFO] 구 에디터 폴백 파서 사용")
+        if not parsed["paragraphs"]:
+            print("  [SKIP] 읽을 수 있는 본문이 없습니다.", file=sys.stderr)
+            continue
+
         parsed["source_url"] = url
         parsed["mobile_url"] = _to_mobile_url(url) or url
+        parsed["query"] = query
+        parsed["search_rank"] = i
+        parsed["rank_status"] = "observed"
+        parsed["retrieved_at"] = datetime.now(UTC).isoformat()
+        parsed["parser_used"] = parser_used
+        parsed["content_sha256"] = hashlib.sha256(html_content.encode("utf-8")).hexdigest()
         results.append(parsed)
         print(f"  → 제목: {parsed['title']!r}  / 단락: {len(parsed['paragraphs'])}개")
         time.sleep(0.5)  # politeness
 
+    if not results:
+        _remove_stale_output(output)
+        print("[ERROR] 읽을 수 있는 참고 글을 확보하지 못했습니다.", file=sys.stderr)
+        return []
+
     # 저장
-    os.makedirs(os.path.dirname(output) if os.path.dirname(output) else ".", exist_ok=True)
-    with open(output, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
+    output_dir = os.path.dirname(output) or "."
+    os.makedirs(output_dir, exist_ok=True)
+    file_descriptor, temporary_output = tempfile.mkstemp(
+        dir=output_dir,
+        prefix=".raw_crawled-",
+        suffix=".tmp",
+        text=True,
+    )
+    try:
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
+        os.replace(temporary_output, output)
+    finally:
+        if os.path.exists(temporary_output):
+            os.remove(temporary_output)
     print(f"\n[DONE] {len(results)}개 저장 → {output}")
     return results
+
+
+def _remove_stale_output(output: str) -> None:
+    if os.path.exists(output):
+        os.remove(output)
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -276,12 +318,18 @@ def main():
     parser.add_argument("--output", required=True, help="결과 JSON 저장 경로")
     args = parser.parse_args()
 
-    run(
-        query=args.query,
-        urls=args.urls,
-        count=args.count,
-        output=args.output,
-    )
+    try:
+        results = run(
+            query=args.query,
+            urls=args.urls,
+            count=args.count,
+            output=args.output,
+        )
+    except OSError as error:
+        print(f"[ERROR] 결과 파일 처리 실패: {error}", file=sys.stderr)
+        raise SystemExit(2) from error
+    if not results:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
